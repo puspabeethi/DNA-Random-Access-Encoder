@@ -1,8 +1,8 @@
 import datetime
-import DNA_DATA_ENCODER
+import DNA_Random_Access_Encoder
 
 begin_time = datetime.datetime.now()
 
-DNA_DATA_ENCODER.encoder(file_name="test.txt", oligo_length=230, primer_pair_count=72)
+DNA_Random_Access_Encoder.encoder(oligo_length=, folder_path=r"")
 
 print(datetime.datetime.now() - begin_time)

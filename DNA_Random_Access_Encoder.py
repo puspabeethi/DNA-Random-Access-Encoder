@@ -13,8 +13,6 @@ def encoder(oligo_length, folder_path):
             with open(file_path, 'r') as f:
                 file_data = str(f.read())
                 data.append(file_data)
-                #file = open(file_name, "r")
-                #data = str(file.read())
                 file_data_size = len(file_data)
                 data_size.append(file_data_size)
     file_count = len(data)

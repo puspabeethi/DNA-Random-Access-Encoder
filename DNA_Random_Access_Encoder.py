@@ -1,43 +1,132 @@
-#import datetime
 import math
 import pandas as pd
-import random
+import os
 
-#begin_time = datetime.datetime.now()
+def encoder(oligo_length, folder_path):
+    os.chdir(folder_path)
+    data = []
+    data_size = []
+    m_p = math.ceil((oligo_length - 40) / 10) - 1
+    for file in os.listdir():
+        if file.endswith(".txt"):
+            file_path = f"{folder_path}\{file}"
+            with open(file_path, 'r') as f:
+                file_data = str(f.read())
+                data.append(file_data)
+                #file = open(file_name, "r")
+                #data = str(file.read())
+                file_data_size = len(file_data)
+                data_size.append(file_data_size)
+    file_count = len(data)
+    os.chdir("..")
+    M = 0
+    total_data_size = 0
+    for i in range(file_count):
+        M = M + math.ceil(data_size[i] / (16 * m_p))
+        total_data_size = total_data_size + data_size[i]
+    if (M > 93756) and (m_p < 19):
+        m_p = 19
+    print('total data size = ' + str(total_data_size) + ' bits, number of oligos = ' + str(M))
 
-def encoder(directory_path, desired_oligo_length):
     df = pd.read_excel('puspabeethis_files\PrimerList_400_with_RC.xlsx', sheet_name='200_primer_pairs', header=0)
     primers = df['Primers'].tolist()
-    dir_list = os.listdir(directory_path)
-    file = open(file_name, "r")
-    data = str(file.read())
-    data_size = len(data)/8
-    m_p = math.ceil((desired_oligo_length - 40)/10) - 1
-    M = math.ceil(data_size/(2 * m_p))
-    print('data size in Bytes = '+str(data_size))
-    print('number of oligos = '+str(M))
+    forward_primers = []
+    reverse_primers_RC = []
+    reverse_primers = []
+    for i in range(file_count):
+        forward_primers.append(primers[2*i])
+        reverse_primers_RC.append(primers[2*i + 1])
+        primer = primers[2*i + 1].replace("A", "1").replace("T", "0").replace("G", "3").replace("C", "2")
+        primer = primer[::-1]
+        primer = primer.replace("0", "A").replace("1", "T").replace("2", "G").replace("3", "C")
+        reverse_primers.append(primer)
+    writer = pd.ExcelWriter('Output_files\ForwardPrimers.xlsx', engine='xlsxwriter')
+    writer.save()
+    df = pd.DataFrame({'Primers': forward_primers})
+    writer = pd.ExcelWriter('Output_files\ForwardPrimers.xlsx', engine='xlsxwriter')
+    df.to_excel(writer, sheet_name=str(file_count) +' forward primers', index=False)
+    writer.save()
+    writer = pd.ExcelWriter('Output_files\ReversePrimers.xlsx', engine='xlsxwriter')
+    writer.save()
+    df = pd.DataFrame({'Primers': reverse_primers})
+    writer = pd.ExcelWriter('Output_files\ReversePrimers.xlsx', engine='xlsxwriter')
+    df.to_excel(writer, sheet_name=str(file_count) + ' reverse primers', index=False)
+    writer.save()
+
     address = addressBook(M)
     codebook = subCode(M)
-    oligos = []
-    for i in range(M):
-        payload = ''
-        for j in range(m_p):
-            message = 256*(128 * int(data[0]) + 64 * int(data[1]) + 32 * int(data[2]) + 16 * int(data[3]) + 8 * int(
-                data[4]) + 4 * int(data[5]) + 2 * int(data[6]) + int(data[7])) + (128 * int(data[8]) + 64 * int(data[9]) + 32 * int(data[10]) + 16 * int(data[11]) + 8 * int(
-                data[12]) + 4 * int(data[13]) + 2 * int(data[14]) + int(data[15]))
-            data = data[16:]
-            print(message, len(data))
-            payload = payload + codebook[message]
-        print(len(payload))
-        n = random.randint(0, 199)
-        primerF = primers[2*n + 0]
-        primerRC = primers[2*n + 1]
-        sequence = primerF + address[i] + payload + primerRC
-        oligos.append(sequence)
-    print(len(oligos))
-    print(len(oligos[0]))
 
-def numberToBase(n,b):
+    oligo_num = 0
+    for k in range(file_count):
+        oligos = []
+        file_M = math.ceil(data_size[k]/(16 * m_p))
+        file_data = data[k]
+        if data_size[k] % (16 * m_p) == 0:
+            for i in range(file_M):
+                payload = ''
+                for j in range(m_p):
+                    message = 256 * (128 * int(file_data[0]) + 64 * int(file_data[1]) + 32 * int(file_data[2]) + 16 * int(file_data[3]) + 8 * int(file_data[4]) + 4 * int(file_data[5]) + 2 * int(file_data[6]) + int(file_data[7])) + (128 * int(file_data[8]) + 64 * int(file_data[9]) + 32 * int(file_data[10]) + 16 * int(file_data[11]) + 8 * int(file_data[12]) + 4 * int(file_data[13]) + 2 * int(file_data[14]) + int(file_data[15]))
+                    file_data = file_data[16:]
+                    print(message, len(file_data))
+                    payload = payload + codebook[message]
+                print(len(payload), payload)
+                primerF = forward_primers[k]
+                primerRC = reverse_primers_RC[k]
+                sequence = primerF + address[oligo_num] + payload + primerRC
+                oligo_num += 1
+                oligos.append(sequence)
+            print(len(oligos), oligos)
+        else:
+            for i in range(file_M - 1):
+                payload = ''
+                for j in range(m_p):
+                    message = 256 * (128 * int(file_data[0]) + 64 * int(file_data[1]) + 32 * int(file_data[2]) + 16 * int(file_data[3]) + 8 * int(file_data[4]) + 4 * int(file_data[5]) + 2 * int(file_data[6]) + int(file_data[7])) + (128 * int(file_data[8]) + 64 * int(file_data[9]) + 32 * int(file_data[10]) + 16 * int(file_data[11]) + 8 * int(file_data[12]) + 4 * int(file_data[13]) + 2 * int(file_data[14]) + int(file_data[15]))
+                    file_data = file_data[16:]
+                    print(message, len(file_data))
+                    payload = payload + codebook[message]
+                print(len(payload), payload)
+                primerF = forward_primers[k]
+                primerRC = reverse_primers_RC[k]
+                sequence = primerF + address[oligo_num] + payload + primerRC
+                oligo_num += 1
+                oligos.append(sequence)
+            print(len(oligos), oligos)
+            rem = int(len(file_data)/16)
+            junk_num = m_p - rem
+            payload = ''
+            for j in range(rem):
+                message = 256 * (128 * int(file_data[0]) + 64 * int(file_data[1]) + 32 * int(file_data[2]) + 16 * int(
+                    file_data[3]) + 8 * int(file_data[4]) + 4 * int(file_data[5]) + 2 * int(file_data[6]) + int(
+                    file_data[7])) + (128 * int(file_data[8]) + 64 * int(file_data[9]) + 32 * int(
+                    file_data[10]) + 16 * int(file_data[11]) + 8 * int(file_data[12]) + 4 * int(
+                    file_data[13]) + 2 * int(file_data[14]) + int(file_data[15]))
+                file_data = file_data[16:]
+                print(message, len(file_data))
+                payload = payload + codebook[message]
+            payload = payload + Junk(junk_num)
+            print(len(payload), payload)
+            primerF = forward_primers[k]
+            primerRC = reverse_primers_RC[k]
+            sequence = primerF + address[oligo_num] + payload + primerRC
+            oligo_num += 1
+            oligos.append(sequence)
+            print(len(oligos), oligos)
+        index = []
+        for i in range(file_M):
+            index.append('>oligo_' + str(i + 1))
+        print(index)
+        file_text = []
+        for j in range(file_M):
+            file_text.append(index[j])
+            file_text.append(oligos[j])
+        print(file_text)
+        print(len(file_text))
+        fasta_file = open('Output_files\DNA_encoded_file'+str(k+1)+'_data.fasta', "w")
+        for l in range(len(file_text)):
+            fasta_file.write(file_text[l] + "\n")
+        fasta_file.close()
+
+def numberToBase(n, b):
     if n == 0:
         return '0'
     digits = []
@@ -54,7 +143,7 @@ def numberToBase(n,b):
 def CountStringStreakBeginning(charVar):
     if len(charVar) == 1:
         return 1
-    for i in range(1,len(charVar)):
+    for i in range(1, len(charVar)):
         if charVar[i] != charVar[0]:
             return i
     return i + 1
@@ -62,7 +151,7 @@ def CountStringStreakBeginning(charVar):
 def CountStringStreakEnding(charVar):
     if len(charVar) == 1:
         return 1
-    for i in range(len(charVar) - 2,-1,-1):
+    for i in range(len(charVar) - 2, -1, -1):
         if charVar[i] != charVar[len(charVar) - 1]:
             return len(charVar) - (i + 1)
     return len(charVar) - i
@@ -93,15 +182,15 @@ def addressBook(M):
     TableData = []
     i = 0
     count = 0
-    while i < 4 ** n_a :
-       charVar = str(numberToBase(i, 4)).rjust(n_a, '0')
-       if ((l != 0 and CountStringStreakBeginning(charVar) > l) or (r != 0 and CountStringStreakEnding(charVar) > r)) == False:
-          if ForbiddenString0 not in charVar and ForbiddenString1 not in charVar and ForbiddenString2 not in charVar and ForbiddenString3 not in charVar:
-             if (charVar.count('2') + charVar.count('3') >= GC_LowerBound) and (charVar.count('2') + charVar.count('3') <= GC_UpperBound):
-                charVar = charVar.replace("0", "A").replace("1", "T").replace("2", "G").replace("3", "C")
-                TableData.insert(count, charVar)
-                count += 1
-       i += 1
+    while i < 4 ** n_a:
+        charVar = str(numberToBase(i, 4)).rjust(n_a, '0')
+        if ((l != 0 and CountStringStreakBeginning(charVar) > l) or (r != 0 and CountStringStreakEnding(charVar) > r)) == False:
+            if ForbiddenString0 not in charVar and ForbiddenString1 not in charVar and ForbiddenString2 not in charVar and ForbiddenString3 not in charVar:
+                if (charVar.count('2') + charVar.count('3') >= GC_LowerBound) and (charVar.count('2') + charVar.count('3') <= GC_UpperBound):
+                    charVar = charVar.replace("0", "A").replace("1", "T").replace("2", "G").replace("3", "C")
+                    TableData.insert(count, charVar)
+                    count += 1
+        i += 1
     if n_a == 8:
         df = pd.read_excel('puspabeethis_files\common_address_len8.xlsx', sheet_name='common_address', header=0)
         common_address = df['common_address'].tolist()
@@ -112,17 +201,19 @@ def addressBook(M):
         common_address = []
     for j in range(len(common_address)):
         TableData.remove(common_address[j])
-    writer = pd.ExcelWriter('AddressBook.xlsx', engine='xlsxwriter')
+    TableData = TableData[0:M]
+    writer = pd.ExcelWriter('Output_files\AddressBook.xlsx', engine='xlsxwriter')
     writer.save()
     df = pd.DataFrame({'Address': TableData})
-    writer = pd.ExcelWriter('AddressBook.xlsx', engine='xlsxwriter')
-    df.to_excel(writer, sheet_name='BlockLength'+str(n_a), index=False)
+    writer = pd.ExcelWriter('Output_files\AddressBook.xlsx', engine='xlsxwriter')
+    df.to_excel(writer, sheet_name='BlockLength ' + str(n_a), index=False)
     writer.save()
     return TableData
 
 def subCode(M):
     df = pd.read_excel('puspabeethis_files\CodeBook_large.xlsx', sheet_name='Min_HammingDistance_2', header=0)
     codebook_large = df['CodeBook_large'].tolist()
+    TableData = codebook_large
     if 9 <= M <= 80:
         df = pd.read_excel('puspabeethis_files\common_codeword_len4.xlsx', sheet_name='common_codeword', header=0)
         common_codeword = df['common_codeword'].tolist()
@@ -138,7 +229,21 @@ def subCode(M):
     else:
         common_codeword = []
     for j in range(len(common_codeword)):
-        codebook_large.remove(common_codeword[j])
-    return codebook_large
+        TableData.remove(common_codeword[j])
+    writer = pd.ExcelWriter('Output_files\CodeBook.xlsx', engine='xlsxwriter')
+    writer.save()
+    df = pd.DataFrame({'CodeBook': TableData})
+    writer = pd.ExcelWriter('Output_files\CodeBook.xlsx', engine='xlsxwriter')
+    df.to_excel(writer, sheet_name='Min_HammingDistance_2', index=False)
+    writer.save()
+    return TableData
 
-#print(datetime.datetime.now() - begin_time)
+def Junk(junk_num):
+    df = pd.read_excel('puspabeethis_files\CodeBook_large.xlsx', sheet_name='Min_HammingDistance_2', header=0)
+    codebook_large = df['CodeBook_large'].tolist()
+    payload = ''
+    for i in range(junk_num):
+        payload = payload +codebook_large[65536+i]
+    print(payload)
+    return payload
+
